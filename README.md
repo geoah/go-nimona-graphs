@@ -1,4 +1,4 @@
-# Nimona Graphs/Chains
+# Nimona Graphs
 
 ### TL;DR
 
@@ -28,32 +28,36 @@ network and have the following list of features:
 
 #### Terminology
 
-* `CHAIN` - An instance of our graph-based datatype. Basically a graph of `EVENT`s.
-* `EVENT` - An update on an existing chain. Check out the "Graph event types".
+* `GRAPH` - An instance of our graph-based datatype. Basically a graph of eventss.
+* `EVENT` - An update on an existing graph. Check out the "Graph event types".
 * `PAYLOAD` - An arbitrary binary payload. Application specific.
-* `PARENTS` - Each `EVENT` is linked to at least one previous `EVENT`; these are its `PARENTS`.
-* `TIP` - All events at a given moment that are not in any other `EVENT`'s `PARENTS`.
-* `PEER` A network peer with a keypair that has access to a chain.
+* `PARENTS` - Each event is linked to at least one previous events; these are its `PARENTS`.
+* `TIP` - One or more events at a given moment that are not in any other event's `PARENTS`.
+* `PEER` A network peer with a keypair that has access to a graph.
 
 #### Graph event types
 
-Graph events are the events that are part of the the graph.  
-All nodes in our graph will be one of these types.
+Graph events persist in the graph.  
+Events are identified by their hash. After the first event of each graph, all
+other events are linked to one or more parent events, forming the graph.
 
-* `CREATE` - Creates a new chain.
-* `SUBSCRIBE` - Subscribes a peer to a chain.
-* `APPEND` - Appends an event to a chain. Append events are the only ones that
-  can contain application payload.
+All events in our graph will be one of these types.
+
+* `CREATE` - Creates a new graph. Create event is the only one without parents.
+* `SUBSCRIBE` - Subscribes a peer to a graph.
+* `APPEND` - Adds an event to the graph. Append events are the only ones that
+  can contain application data (payload).
 
 #### Network event types
 
 Network events are events that help peers create, update, or sync graphs between
 themselves. They do not persist in the graph itself.
 
-* `ANNOUNCE(EVENT)` - Announces an `EVENT` to a peer.
-* `SYNC(TIP)` - Tries to synchronize missing `EVENT`s with a `PEER` by telling
-  them its current `TIP`. This way both `PEER`s will work backwards from their
-  `TIP`s and get from the other party the `EVENT`s they are missing.
+* `ANNOUNCE(EVENT)` - Announces an event to a peer.
+* `SYNC(TIP)` - Tries to synchronize missing events with a peer by exchanging
+  tips. Both peers will work backwards from the tips they received, figure out
+  the events they are missing and retrieve them.
+* `GET(EVENT_ID)` - Request an event by its id.
 
 #### Chatroom example
 
