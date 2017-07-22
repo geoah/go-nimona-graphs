@@ -13,13 +13,10 @@ or ideas; please drop by the issues and let's have a chat.
 
 ### Purpose
 
-The purpose of this specification/protocol/project or whatever you wanna call
-it is a bit hard for me to explain, but I'll give it a shot anyway.
-
-I wanted a data structure that can live in a peer to peer or decentralized 
+To create a data structure that can live in a peer to peer or decentralized 
 network and have the following list of features:
 
-* Easy to sync across peers.
+* Easy to sync missing and new updates.
 * Allow for updates, optionally with an inherit way to resolve conflicts.
 * Allow peers to subscribe to future updates.
 * Allow for permissions, at the very least read, write, and subscribe.
