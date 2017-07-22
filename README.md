@@ -73,7 +73,7 @@ to send messages to it.
 
 So `EVENT 1` is a `CREATE` event that would look something like:
 
-```json
+```
 {
     id: "1", // hash of the header
     header: {
@@ -122,7 +122,7 @@ And event `2b` will be `ANNOUNCED` to users a, b, and d.
 
 For example `EVENT 2a` will look something like this:
 
-```json
+```
 {
     id: "2a",
     header: {
@@ -151,7 +151,7 @@ current graph `TIP` consists of `EVENT 2a` and `EVENT 2b`. These will be the
 
 This event will look something like:
 
-```json
+```
 {
     id: "3a",
     header: {
