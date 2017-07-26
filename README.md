@@ -25,11 +25,12 @@ network and have the following list of features:
 
 #### Terminology
 
-* `GRAPH` - An instance of our graph-based datatype. Basically a graph of eventss.
+* `GRAPH` - An instance of our graph-based datatype. Basically a graph of events.
 * `EVENT` - An update on an existing graph. Check out the "Graph event types".
 * `PAYLOAD` - An arbitrary binary payload. Application specific.
 * `PARENTS` - Each event is linked to at least one previous events; these are its `PARENTS`.
 * `TIP` - One or more events at a given moment that are not in any other event's `PARENTS`.
+  These are also the most recent events.
 * `PEER` A network peer with a keypair that has access to a graph.
 
 #### Graph event types
@@ -40,7 +41,7 @@ other events are linked to one or more parent events, forming the graph.
 
 All events in our graph will be one of these types.
 
-* `CREATE` - Creates a new graph. Create event is the only one without parents.
+* `CREATE` - Creates a new graph. This event type is the only one without parents.
 * `SUBSCRIBE` - Subscribes a peer to a graph.
 * `APPEND` - Adds an event to the graph. Append events are the only ones that
   can contain application data (payload).
@@ -65,7 +66,7 @@ Each chat room is a graph and messages are events on that graph.
 *Note: Epochs are just for demonstration purposes, they just show events that 
 happened and were propagated in the network at the same time.*
 
-![enter image description here](readme-graph.png)
+![graph example](readme-graph.png)
 
 ##### Epoch 1
 
