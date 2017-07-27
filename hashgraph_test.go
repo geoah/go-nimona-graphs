@@ -3,40 +3,46 @@ package hashgraph
 import (
 	"testing"
 
+	mock "github.com/stretchr/testify/mock"
 	suite "github.com/stretchr/testify/suite"
 
-	events "github.com/nimona/go-nimona-events"
-	peerstore "github.com/nimona/go-nimona-peerstore"
-	"github.com/stretchr/testify/mock"
+	mb "github.com/nimona/go-nimona-messagebus"
+	net "github.com/nimona/go-nimona-net"
 )
 
 type HashgraphTestSuite struct {
 	suite.Suite
-	hashgraph  *Hashgraph
-	blockstore *BlockStore
-	eventbus   *events.MockEventBus
-	handler    func(block *Block) error
-	peerID     string
+	hashgraph    *Hashgraph
+	blockstore   *BlockStore
+	messagebus   *mb.MockMessageBus
+	hashgraphbus *HashgraphBus
+	handler      func(block *Block) error
+	peerID       string
 }
 
 func (s *HashgraphTestSuite) SetupTest() {
-	s.peerID = "peer-owner"
-	s.eventbus = &events.MockEventBus{}
+	peer := net.Peer{
+		ID: "peer-owner",
+	}
+	s.peerID = peer.ID
+	s.messagebus = &mb.MockMessageBus{}
 	s.blockstore = &BlockStore{
 		blocks: map[string]*Block{},
 	}
 	s.hashgraph = &Hashgraph{
-		peer: &peerstore.BasicPeer{
-			ID: peerstore.ID(s.peerID),
-		},
-		blocks:   s.blockstore,
-		eventBus: s.eventbus,
+		peer:   peer,
+		blocks: s.blockstore,
+	}
+	s.hashgraphbus = &HashgraphBus{
+		peer:      peer,
+		eventbus:  s.messagebus,
+		hashgraph: s.hashgraph,
+		handlers:  []func(bl *Block) error{},
 	}
 }
 
 func (s *HashgraphTestSuite) TestCreateGraphSucceeds() {
-	title := "new-graph"
-	recipients := []string{"peer-1"}
+	acl := BlockEventACL{}
 
 	// reset blockstore
 	for k := range s.blockstore.blocks {
@@ -46,40 +52,36 @@ func (s *HashgraphTestSuite) TestCreateGraphSucceeds() {
 	// check that the blockstore is empty
 	s.Len(s.blockstore.blocks, 0)
 
-	// keep some things from the eventbus for future tests
-	var event *events.Event
+	// keep some things from the messagebus for future tests
+	var payload *mb.Payload
 	var block *Block
 
 	// mock event bus send
-	s.eventbus.On("Send", mock.AnythingOfType("*events.Event")).Return(nil).
+	s.messagebus.On("Send", mock.AnythingOfType("*messagebus.Payload"), []string{}).Return(nil).
 		Run(func(args mock.Arguments) {
-			s.IsType(&events.Event{}, args[0])
-			event = args[0].(*events.Event)
-
-			s.Equal(s.peerID, event.OwnerID)
-			s.Equal(s.peerID, event.SenderID)
-			s.IsType(&Block{}, event.Payload)
-			block = event.Payload.(*Block)
+			s.IsType(&mb.Payload{}, args[0])
+			payload = args[0].(*mb.Payload)
+			s.Equal(s.peerID, payload.Creator)
+			block, _ = DecodeBlock(payload.Data)
 			s.Equal(s.peerID, block.Event.Author)
-			s.Equal(title, block.Event.Data)
 			s.Len(block.Event.Parents, 0)
 			s.Equal(EventTypeGraphCreate, block.Event.Type)
 		})
 
 	// create the graph
-	hash, err := s.hashgraph.CreateGraph(title, recipients)
+	oblock, err := s.hashgraphbus.CreateGraph(acl)
 	s.Nil(err)
-	s.Equal(hash, block.Hash)
+	s.NotNil(block)
+	s.NotNil(oblock)
+	s.Equal(oblock.Hash, block.Hash)
 
 	// check that the blockstore has at least one block
 	s.Len(s.blockstore.blocks, 1)
-	// and check something in the block just in case
-	s.Equal(title, s.blockstore.blocks[block.Hash].Event.Data)
+	s.Equal(s.peerID, s.blockstore.blocks[block.Hash].Event.Author)
 }
 
 func (s *HashgraphTestSuite) TestSubscribeGraphSucceeds() {
-	title := "new-graph"
-	recipients := []string{"peer-1"}
+	acl := BlockEventACL{}
 
 	// reset blockstore
 	for k := range s.blockstore.blocks {
@@ -89,51 +91,49 @@ func (s *HashgraphTestSuite) TestSubscribeGraphSucceeds() {
 	// check that the blockstore is empty
 	s.Len(s.blockstore.blocks, 0)
 
-	// keep some things from the eventbus for future tests
-	var event *events.Event
+	// keep some things from the messagebus for future tests
+	var payload *mb.Payload
 	var block *Block
 
 	// mock event bus send
-	s.eventbus.On("Send", mock.AnythingOfType("*events.Event")).Return(nil).
+	s.messagebus.On("Send", mock.AnythingOfType("*messagebus.Payload"), []string{}).Return(nil).
 		Run(func(args mock.Arguments) {
-			s.IsType(&events.Event{}, args[0])
-			event = args[0].(*events.Event)
-			s.Equal(s.peerID, event.OwnerID)
-			s.Equal(s.peerID, event.SenderID)
-			s.IsType(&Block{}, event.Payload)
-			block = event.Payload.(*Block)
+			s.IsType(&mb.Payload{}, args[0])
+			payload = args[0].(*mb.Payload)
+			s.Equal(s.peerID, payload.Creator)
+			block, _ = DecodeBlock(payload.Data)
 			s.Equal(s.peerID, block.Event.Author)
-			s.Equal(title, block.Event.Data)
 			s.Len(block.Event.Parents, 0)
 			s.Equal(EventTypeGraphCreate, block.Event.Type)
 		})
 
 	// create the graph
-	hash, err := s.hashgraph.CreateGraph(title, recipients)
+	cblock, err := s.hashgraphbus.CreateGraph(acl)
 	s.Nil(err)
-	s.Equal(hash, block.Hash)
+	s.Equal(cblock.Hash, block.Hash)
 
 	// clear previous mocks
-	s.eventbus.Mock = mock.Mock{}
+	s.messagebus.Mock = mock.Mock{}
 
 	// mock event bus send
-	s.eventbus.On("Send", mock.AnythingOfType("*events.Event")).Return(nil).
+	s.messagebus.On("Send", mock.AnythingOfType("*messagebus.Payload"), []string{}).Return(nil).
 		Run(func(args mock.Arguments) {
-			s.IsType(&events.Event{}, args[0])
-			event = args[0].(*events.Event)
-			s.Equal(s.peerID, event.OwnerID)
-			s.Equal(s.peerID, event.SenderID)
-			s.IsType(&Block{}, event.Payload)
-			block = event.Payload.(*Block)
+			s.IsType(&mb.Payload{}, args[0])
+			payload = args[0].(*mb.Payload)
+			s.Equal(s.peerID, payload.Creator)
+			block, _ = DecodeBlock(payload.Data)
 			s.Equal(s.peerID, block.Event.Author)
-			s.Equal([]string{hash}, block.Event.Parents)
+			s.Len(block.Event.Parents, 1)
+			s.Equal(EventTypeGraphSubscribe, block.Event.Type)
+			s.Equal(s.peerID, block.Event.Author)
+			s.Equal([]string{cblock.Hash}, block.Event.Parents)
 			s.Equal(EventTypeGraphSubscribe, block.Event.Type)
 		})
 
-	// create the graph
-	hash, err = s.hashgraph.Subscribe(hash)
+	// subscribe to the graph
+	sblock, err := s.hashgraphbus.Subscribe(cblock.Hash)
 	s.Nil(err)
-	s.Equal(hash, block.Hash)
+	s.Equal(sblock.Hash, block.Hash)
 
 	// check that the blockstore has at least one block
 	s.Len(s.blockstore.blocks, 2)
